@@ -4,7 +4,7 @@ pub struct RawNovel {
 }
 
 impl RawNovel {
-    pub async fn get(ncode: &str) -> Result<RawNovel, Box<dyn std::error::Error>> {
+    pub async fn get(ncode: &str, progress: &mut indicatif::ProgressBar) -> Result<RawNovel, Box<dyn std::error::Error>> {
         let http_client = reqwest::Client::builder()
             .user_agent("Mozilla/5.0")
             .build()?;
@@ -16,27 +16,39 @@ impl RawNovel {
             .text()
             .await?;
 
-        let chapter_link_selector =
-            scraper::Selector::parse("div.index_box > dl.novel_sublist2 > dd.subtitle > a")?;
-        let parsed_toc = scraper::Html::parse_document(&toc); // TODO: use spawn_blocking()
+        // println!("{}", &toc);
+
+        let chapter_links = {
+            let chapter_link_selector =
+                scraper::Selector::parse("div.index_box > dl.novel_sublist2 > dd.subtitle > a")?;
+            let parsed_toc = scraper::Html::parse_document(&toc); // TODO: use spawn_blocking()
+
+            parsed_toc
+                .select(&chapter_link_selector)
+                .filter_map(|chapter_link| {
+                    chapter_link
+                        .value()
+                        .attr("href")
+                        .map(|href| href.to_string())
+                })
+                .collect::<Vec<_>>()
+        };
+
+        progress.set_length(chapter_links.len() as u64);
 
         let mut chapters = Vec::new();
-        for chapter_link in parsed_toc.select(&chapter_link_selector) {
-            if let Some(path) = chapter_link.value().attr("href") {
-                let chapter = http_client
+        for path in chapter_links {
+            let chapter = http_client
                 .get(format!("https://ncode.syosetu.com{path}")) // TODO: extract BASE_URL constant
                 .send()
                 .await?
                 .text()
                 .await?;
 
-                chapters.push(chapter);
-            }
+            chapters.push(chapter);
+            progress.inc(1);
         }
 
-        Ok(RawNovel {
-            toc,
-            chapters,
-        })
+        Ok(RawNovel { toc, chapters })
     }
 }
