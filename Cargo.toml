@@ -6,8 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+async-process = "1.7.0"
 clap = { version = "4.2.4", features = ["derive"] }
 indicatif = "0.17.3"
 reqwest = "0.11.16"
 scraper = "0.16.0"
+tempfile = "3.5.0"
 tokio = { version = "1.27.0", features = ["full"] }
